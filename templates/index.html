@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Red de Balanceo de Líneas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Red de Balanceo de Líneas</h1>
+        {% if error %}
+        <div class="error">
+            <p>{{ error }}</p>
+        </div>
+        {% endif %}
+        <form method="POST">
+            <div class="input-section">
+                <table id="tareas-table">
+                    <thead>
+                        <tr>
+                            <th>Tarea</th>
+                            <th>Tiempo</th>
+                            <th>Procedencia</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="text" name="tareas" required></td>
+                            <td><input type="number" name="tiempos" required min="1"></td>
+                            <td><input type="text" name="procedencia" placeholder="Separar con comas si hay múltiples">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="form-actions">
+                    <button type="button" id="agregar-fila">+ Agregar Fila</button>
+                    <button type="button" id="eliminar-fila">- Eliminar Fila</button>
+                    <button type="button" id="limpiar">Limpiar</button>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <div>
+                    <label>Producción Diaria Requerida:</label>
+                    <input type="number" name="produccion" required min="1">
+                </div>
+                <div>
+                    <label>Horas de Trabajo:</label>
+                    <select name="horas-trabajo">
+                        {% for i in range(1, 25) %}
+                        <option value="{{ i }}">{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label>Unidad de Tiempo:</label>
+                    <select name="unidad-tiempo">
+                        <option value="segundos">Segundos</option>
+                        <option value="minutos">Minutos</option>
+                        <option value="horas">Horas</option>
+                        <option value="dias">Días</option>
+                    </select>
+                </div>
+                <button type="submit" name="calcular">Calcular</button>
+            </div>
+        </form>
+
+        {% if grafico %}
+        <div class="resultado-section" id="resultados">
+            <h2>Diagrama de Red de Tareas</h2>
+            <img src="{{ url_for('static', filename='grafico_estaciones.png') }}" alt="Diagrama de Red">
+        </div>
+        {% endif %}
+
+        {% if resultado %}
+        <div class="resultado-section" id="resultados">
+            <h2>Resultados del Balanceo de Líneas</h2>
+
+            <!-- Mostrar Cálculos Realizados -->
+            <div class="calculos-realizados">
+                <h3>Cálculos Realizados</h3>
+                <ul>
+                    <li><strong>Suma de Todos los Tiempos de las Tareas:</strong> {{ resultado.sum_tiempos }}</li>
+                    <li><strong>Tiempo de Producción Disponible:</strong> {{ resultado.tiempo_produccion_disponible }}
+                    </li>
+                    <li><strong>Tiempo de Ciclo:</strong> {{ resultado.tiempo_ciclo }}</li>
+                    <li><strong>Número de Estaciones:</strong> {{ resultado.numero_estaciones }}</li>
+                </ul>
+            </div>
+
+            <!-- Mostrar Tabla de Estaciones -->
+            <table class="resultado-tabla">
+                <thead>
+                    <tr>
+                        <th>Estación</th>
+                        <th>Tareas Disponibles</th>
+                        <th>Tiempos de Tarea</th>
+                        <th>Tiempo Restante</th>
+                        <th>Tareas Factibles</th>
+                        <th>Tareas Seleccionadas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for estacion in resultado.estaciones_detalle %}
+                    <tr>
+                        <td>{{ estacion.estacion }}</td>
+                        <td>{{ estacion.tareas_disponibles | join(', ') }}</td>
+                        <td>{{ estacion.tiempos_tarea | join(', ') }}</td>
+                        <td>{{ estacion.tiempo_restante }}</td>
+                        <td>{{ estacion.tareas_factibles | join(', ') }}</td>
+                        <td>{{ estacion.tareas_seleccionadas | join(', ') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Mostrar Eficiencia Total -->
+            <div class="eficiencia-total">
+                <h3>Eficiencia Total del Balanceo de Líneas:</h3>
+                <p><strong>{{ resultado.eficiencia_total }}%</strong></p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        document.getElementById('agregar-fila').addEventListener('click', function () {
+            var table = document.getElementById('tareas-table').getElementsByTagName('tbody')[0];
+            var newRow = table.insertRow();
+            newRow.innerHTML = `
+                <td><input type="text" name="tareas" required></td>
+                <td><input type="number" name="tiempos" required min="1"></td>
+                <td><input type="text" name="procedencia" placeholder="Separar con comas si hay múltiples"></td>
+            `;
+        });
+
+        document.getElementById('eliminar-fila').addEventListener('click', function () {
+            var table = document.getElementById('tareas-table');
+            if (table.rows.length > 2) { // 1 fila de encabezado + 1 fila de datos
+                table.deleteRow(table.rows.length - 1);
+            }
+        });
+
+        document.getElementById('limpiar').addEventListener('click', function () {
+            // Limpiar datos del formulario
+            var form = document.querySelector('form');
+            form.reset();
+
+            // Limpiar la tabla de tareas
+            var tableBody = document.getElementById('tareas-table').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '<tr><td><input type="text" name="tareas" required></td><td><input type="number" name="tiempos" required min="1"></td><td><input type="text" name="procedencia" placeholder="Separar con comas si hay múltiples"></td></tr>';
+
+            // Ocultar los resultados y la gráfica
+            var resultados = document.getElementById('resultados');
+            if (resultados) {
+                resultados.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+
+</html>
